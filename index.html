@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pemilihan Ketua & Wakil OSIS - Sistem Voting</title>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+ 
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
 
@@ -648,13 +651,63 @@ let selectedKandidat = null;
 let isAdmin = false;
 let adminMenuAktif = 'dashboard'; // dashboard | pemilih | suara | grafik | password | reset
 
+/* ============================================================
+   ✅ TITIK 2: FIREBASE REALTIME DATABASE (PENGGANTI localStorage)
+   ------------------------------------------------------------
+   Ganti nilai di dalam firebaseConfig dengan data dari
+   Firebase Console Anda (Project settings > Your apps > Web app).
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "ISI_API_KEY_ANDA",
+  authDomain: "NAMA-PROYEK.firebaseapp.com",
+  databaseURL: "https://NAMA-PROYEK-default-rtdb.firebaseio.com",
+  projectId: "NAMA-PROYEK",
+  storageBucket: "NAMA-PROYEK.appspot.com",
+  messagingSenderId: "ANGKA_SENDER_ID",
+  appId: "APP_ID_ANDA"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// "Tiruan" localStorage, tapi sumber resminya Firebase
+const DB_CACHE = {};
+
 const Storage = {
   get(key) {
-    try { return JSON.parse(localStorage.getItem(key)) || null; }
-    catch { return null; }
+    return (key in DB_CACHE) ? DB_CACHE[key] : null;
   },
-  set(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+  set(key, val) {
+    DB_CACHE[key] = val;
+    db.ref(key).set(val).catch(err => console.error('Gagal simpan ke Firebase:', err));
+  }
 };
+
+// Update layar Admin otomatis saat ada perubahan dari perangkat lain
+function pasangListener() {
+  ['suara', 'sudahVoting', 'adminPassword', 'totalPemilih'].forEach(key => {
+    db.ref(key).on('value', snap => {
+      DB_CACHE[key] = snap.val();
+      if (isAdmin) renderAdmin();
+    });
+  });
+}
+
+// Ambil data awal dari Firebase, baru inisialisasi & pasang listener
+async function initFirebase() {
+  try {
+    const snap = await db.ref().once('value');
+    const data = snap.val() || {};
+    ['suara', 'sudahVoting', 'adminPassword', 'totalPemilih'].forEach(k => {
+      if (k in data) DB_CACHE[k] = data[k];
+    });
+  } catch (e) {
+    console.error('Gagal ambil data awal dari Firebase:', e);
+  }
+  initData();        // isi nilai default HANYA untuk data yang belum ada
+  renderKandidat();
+  pasangListener();
+}
 
 function initData() {
   if (!Storage.get('suara')) {
@@ -1106,9 +1159,8 @@ function resetSuara() {
   if (isAdmin) renderAdmin();
 }
 
-// Inisialisasi
-initData();
-renderKandidat();
+// Inisialisasi (sekarang lewat Firebase)
+initFirebase();
 </script>
 </body>
 </html>
