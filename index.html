@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="id">
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pemilihan Ketua & Wakil OSIS - Sistem Voting</title>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
  
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
@@ -652,48 +652,50 @@ let isAdmin = false;
 let adminMenuAktif = 'dashboard'; // dashboard | pemilih | suara | grafik | password | reset
 
 /* ============================================================
-   ✅ TITIK 2: FIREBASE REALTIME DATABASE (PENGGANTI localStorage)
-   ------------------------------------------------------------
-   Ganti nilai di dalam firebaseConfig dengan data dari
-   Firebase Console Anda (Project settings > Your apps > Web app).
+   ✅ KONFIGURASI FIREBASE REALTIME (PENGGANTI localStorage)
    ============================================================ */
 const firebaseConfig = {
-  apiKey: "ISI_API_KEY_ANDA",
-  authDomain: "NAMA-PROYEK.firebaseapp.com",
-  databaseURL: "https://NAMA-PROYEK-default-rtdb.firebaseio.com",
-  projectId: "NAMA-PROYEK",
-  storageBucket: "NAMA-PROYEK.appspot.com",
-  messagingSenderId: "ANGKA_SENDER_ID",
-  appId: "APP_ID_ANDA"
+  apiKey: "AIzaSyDZXqODgYvBSjRRRVp-2doIhGWP7cdXyx4",
+  authDomain: "projek19-a8b01.firebaseapp.com",
+  databaseURL: "https://projek19-a8b01-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "projek19-a8b01",
+  storageBucket: "projek19-a8b01.firebasestorage.app",
+  messagingSenderId: "996368727623",
+  appId: "1:996368727623:web:8dd59e75541acd044a3b62",
+  measurementId: "G-2XRHTPY7SL"
 };
 
+// Inisialisasi Firebase (Versi Compat untuk HTML biasa)
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// "Tiruan" localStorage, tapi sumber resminya Firebase
+// Cache lokal agar aplikasi tetap cepat seperti localStorage
 const DB_CACHE = {};
 
+// Kita "menipu" fungsi Storage lama agar menulis ke Firebase, bukan ke localStorage
 const Storage = {
   get(key) {
     return (key in DB_CACHE) ? DB_CACHE[key] : null;
   },
   set(key, val) {
-    DB_CACHE[key] = val;
+    DB_CACHE[key] = val; // Update cache lokal
+    // Kirim ke database cloud secara real-time
     db.ref(key).set(val).catch(err => console.error('Gagal simpan ke Firebase:', err));
   }
 };
 
-// Update layar Admin otomatis saat ada perubahan dari perangkat lain
+// Fungsi untuk mendengarkan perubahan dari perangkat lain (Real-time Sync)
 function pasangListener() {
   ['suara', 'sudahVoting', 'adminPassword', 'totalPemilih'].forEach(key => {
     db.ref(key).on('value', snap => {
       DB_CACHE[key] = snap.val();
-      if (isAdmin) renderAdmin();
+      // Jika sedang di halaman admin, refresh tampilannya otomatis
+      if (isAdmin) renderAdmin(); 
     });
   });
 }
 
-// Ambil data awal dari Firebase, baru inisialisasi & pasang listener
+// Fungsi inisialisasi baru: Ambil data dari Firebase dulu, baru jalankan aplikasi
 async function initFirebase() {
   try {
     const snap = await db.ref().once('value');
@@ -702,11 +704,12 @@ async function initFirebase() {
       if (k in data) DB_CACHE[k] = data[k];
     });
   } catch (e) {
-    console.error('Gagal ambil data awal dari Firebase:', e);
+    console.error('Gagal ambil data awal:', e);
   }
-  initData();        // isi nilai default HANYA untuk data yang belum ada
-  renderKandidat();
-  pasangListener();
+  
+  initData();        // Isi data default HANYA jika belum ada di database
+  renderKandidat();  // Tampilkan kandidat
+  pasangListener();  // Aktifkan sinkronisasi real-time
 }
 
 function initData() {
@@ -1159,7 +1162,7 @@ function resetSuara() {
   if (isAdmin) renderAdmin();
 }
 
-// Inisialisasi (sekarang lewat Firebase)
+// Inisialisasi menggunakan Firebase
 initFirebase();
 </script>
 </body>
